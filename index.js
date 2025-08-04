@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const fetch = require('node-fetch');
 
-const OPENAI_WS_URL = 'wss://api.openai.com/v1/audio/chat'; // OpenAI Realtime endpoint
+const OPENAI_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2025-06-03'; // OpenAI Realtime endpoint
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'JOUW_OPENAI_API_KEY_HIER';
 
 const server = new WebSocket.Server({ port: process.env.PORT || 3000 });
