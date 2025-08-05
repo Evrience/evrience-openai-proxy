@@ -26,6 +26,7 @@ server.on('connection', (clientWs) => {
 
         // Stuur alle gebufferde berichten nu door
         messageBuffer.forEach(msg => {
+            console.log('Inhoud (eerste 300 tekens):', msg.slice(0,300).toString());
             aiWs.send(msg, err => {
                 if (err) console.error("Fout bij versturen buffered bericht:", err.stack || err);
             });
@@ -36,6 +37,7 @@ server.on('connection', (clientWs) => {
     clientWs.on('message', (msg) => {
         console.log(`Bericht van Unity naar OpenAI (lengte ${msg.length})`);
         if (aiWs.readyState === WebSocket.OPEN) {
+            console.log('Inhoud (eerste 300 tekens):', msg.slice(0,300).toString());
             aiWs.send(msg, err => {
                 if (err) console.error("Fout bij versturen naar OpenAI:", err.stack || err);
                 else console.log("Bericht succesvol doorgestuurd naar OpenAI");
