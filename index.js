@@ -1,94 +1,75 @@
 const WebSocket = require('ws');
-const fetch = require('node-fetch');
+const wss = new WebSocket.Server({ port: 3000 });  // or your configured port
 
-const OPENAI_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2025-06-03'; // OpenAI Realtime endpoint
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'JOUW_OPENAI_API_KEY_HIER';
+wss.on('connection', function connection(clientWs) {
+  console.log("Nieuwe Unity client verbonden");
 
-const server = new WebSocket.Server({ port: process.env.PORT || 3000 });
-console.log("WebSocket proxy gestart op poort", process.env.PORT || 3000);
+  // Create OpenAI WS connection when a Unity client connects
+  const openAIWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=${MODEL_ID}`, {
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "OpenAI-Beta": "realtime=v1"
+    }
+  });
 
-server.on('connection', (clientWs) => {
-    console.log("Nieuwe Unity client verbonden");
-    console.log(`Client WS readyState: ${clientWs.readyState}`);
+  // Buffer messages from Unity until OpenAI WS is open
+  const pendingMessages = [];
+  let openAIReady = false;
 
-    const aiWs = new WebSocket(OPENAI_WS_URL, {
-        headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'OpenAI-Beta': 'realtime=v1'
-        }
-    });
+  openAIWs.on('open', () => {
+    console.log("OpenAI connection is open");
+    openAIReady = true;
+    // Flush any buffered Unity messages
+    for (const msg of pendingMessages) {
+      openAIWs.send(msg);
+    }
+    pendingMessages.length = 0;
+  });
 
-    let messageBuffer = [];
+  // Relay messages from Unity to OpenAI
+  clientWs.on('message', (data) => {
+    if (!openAIReady) {
+      console.log("AI WebSocket not yet open, buffering Unity message");
+      pendingMessages.push(data);
+    } else {
+      // Forward Unity's message to OpenAI
+      openAIWs.send(data);
+    }
+  });
 
-    aiWs.on('open', () => {
-        console.log("OpenAI verbinding is open");
-        console.log(`AI WS readyState: ${aiWs.readyState}`);
+  // Relay messages from OpenAI to Unity
+  openAIWs.on('message', (data) => {
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(data);
+      console.log(`Bericht van OpenAI naar Unity (lengte ${data.length})`);
+    }
+  });
 
-        // Stuur alle gebufferde berichten nu door
-        messageBuffer.forEach(msg => {
-            console.log('Inhoud (eerste 300 tekens):', msg.slice(0,300).toString());
-            aiWs.send(msg, err => {
-                if (err) console.error("Fout bij versturen buffered bericht:", err.stack || err);
-            });
-        });
-        messageBuffer = [];
-    });
+  // Handle OpenAI socket closing
+  openAIWs.on('close', (code, reason) => {
+    console.log(`OpenAI ws gesloten. Code: ${code}, reden: ${reason || 'geen'}`);
+    // If OpenAI closed first unexpectedly, inform Unity or close Unity socket
+    if (clientWs.readyState === WebSocket.OPEN) {
+      // You can either close the Unity socket or send an error message
+      clientWs.close(1000, "OpenAI session ended");  // normal closure
+    }
+  });
 
-    clientWs.on('message', (msg) => {
-        console.log(`Bericht van Unity naar OpenAI (lengte ${msg.length})`);
-        if (aiWs.readyState === WebSocket.OPEN) {
-            console.log('Inhoud (eerste 300 tekens):', msg.slice(0,300).toString());
-            aiWs.send(msg, err => {
-                if (err) console.error("Fout bij versturen naar OpenAI:", err.stack || err);
-                else console.log("Bericht succesvol doorgestuurd naar OpenAI");
-            });
-        } else {
-            console.log(`AI WebSocket nog niet open (readyState: ${aiWs.readyState}), bericht gebufferd.`);
-            messageBuffer.push(msg);
-        }
-    });
+  openAIWs.on('error', (err) => {
+    console.error("OpenAI WS error:", err);
+    // Possibly forward an error to Unity or close connections
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close(1011, "OpenAI error");  // 1011 = internal error
+    }
+  });
 
-    // Proxy berichten van AI → client
-    aiWs.on('message', (msg) => {
-        console.log(`Bericht van OpenAI naar Unity (lengte ${msg.length})`);
-        if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(msg, (err) => {
-                if (err) {
-                    console.error("Fout bij versturen naar Unity client:", err.stack || err);
-                } else {
-                    console.log("Bericht succesvol doorgestuurd naar Unity client");
-                }
-            });
-        } else {
-            console.warn(`Client WebSocket niet open (readyState: ${clientWs.readyState}), bericht niet verzonden.`);
-        }
-    });
+  // Handle Unity socket closing
+  clientWs.on('close', () => {
+    console.log("Unity client gesloten.");
+    // Close OpenAI socket if it's still open
+    if (openAIWs.readyState === WebSocket.OPEN || openAIWs.readyState === WebSocket.CONNECTING) {
+      openAIWs.close(1000);  // normal closure
+    }
+  });
 
-    aiWs.on('close', (code, reason) => {
-        console.log(`OpenAI ws gesloten. Code: ${code}, reden: ${reason}`);
-        if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.close(code, reason);
-        }
-    });
-
-    aiWs.on('error', (err) => {
-        console.error("OpenAI ws error:", err.stack || err);
-        if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.close();
-        }
-    });
-
-    clientWs.on('close', (code, reason) => {
-        console.log(`Unity client gesloten. Code: ${code}, reden: ${reason}`);
-        if (aiWs.readyState === WebSocket.OPEN) {
-            aiWs.close(code, reason);
-        }
-    });
-
-    clientWs.on('error', (err) => {
-        console.error("Unity ws error:", err.stack || err);
-        if (aiWs.readyState === WebSocket.OPEN) {
-            aiWs.close();
-        }
-    });
 });
