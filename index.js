@@ -22,12 +22,12 @@ server.on('connection', (clientWs) => {
 
     // Proxy berichten van client → AI
     clientWs.on('message', (msg) => {
-        if (aiWs.readyState === WebSocket.OPEN) {
-            aiWs.send(msg);
-        } else {
-            // Buffer eventueel tot open?
-        }
+    console.log("Bericht van Unity naar OpenAI:", msg.toString());
+    if (aiWs.readyState === WebSocket.OPEN) {
+        aiWs.send(msg);
+    }
     });
+
 
     // Proxy berichten van AI → client
     aiWs.on('message', (msg) => {
