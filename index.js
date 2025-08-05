@@ -11,33 +11,38 @@ server.on('connection', (clientWs) => {
     console.log("Nieuwe Unity client verbonden");
     console.log(`Client WS readyState: ${clientWs.readyState}`);
 
-    // OpenAI connectie
     const aiWs = new WebSocket(OPENAI_WS_URL, {
         headers: {
             'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'OpenAI-Beta': 'realtime=v1' // <-- BELANGRIJK!
-            // Voeg extra headers toe als nodig (bv. JWT!)
+            'OpenAI-Beta': 'realtime=v1'
         }
     });
+
+    let messageBuffer = [];
 
     aiWs.on('open', () => {
         console.log("OpenAI verbinding is open");
         console.log(`AI WS readyState: ${aiWs.readyState}`);
+
+        // Stuur alle gebufferde berichten nu door
+        messageBuffer.forEach(msg => {
+            aiWs.send(msg, err => {
+                if (err) console.error("Fout bij versturen buffered bericht:", err.stack || err);
+            });
+        });
+        messageBuffer = [];
     });
 
-    // Proxy berichten van client → AI
     clientWs.on('message', (msg) => {
-        console.log(`Bericht van Unity naar OpenAI (lengte ${msg.length}):`, msg.toString());
+        console.log(`Bericht van Unity naar OpenAI (lengte ${msg.length})`);
         if (aiWs.readyState === WebSocket.OPEN) {
-            aiWs.send(msg, (err) => {
-                if (err) {
-                    console.error("Fout bij versturen naar OpenAI:", err.stack || err);
-                } else {
-                    console.log("Bericht succesvol doorgestuurd naar OpenAI");
-                }
+            aiWs.send(msg, err => {
+                if (err) console.error("Fout bij versturen naar OpenAI:", err.stack || err);
+                else console.log("Bericht succesvol doorgestuurd naar OpenAI");
             });
         } else {
-            console.warn(`AI WebSocket niet open (readyState: ${aiWs.readyState}), bericht niet verzonden.`);
+            console.log(`AI WebSocket nog niet open (readyState: ${aiWs.readyState}), bericht gebufferd.`);
+            messageBuffer.push(msg);
         }
     });
 
