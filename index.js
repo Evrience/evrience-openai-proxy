@@ -38,15 +38,8 @@ server.on('connection', (clientWs) => {
 
     aiWs.on('open', () => {
     console.log("OpenAI verbinding is open");
-    // Stuur init-event!
-    const initEvent = {
-      type: "session",
-      model: "gpt-4o-realtime-preview-2025-06-03",
-      voice: "onyx",
-      system: "You are a helpful assistant."
-    };
-        aiWs.send(JSON.stringify(initEvent));
     });
+
 
     aiWs.on('close', () => {
         console.log("OpenAI ws gesloten");
