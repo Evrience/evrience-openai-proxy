@@ -1,5 +1,11 @@
 const WebSocket = require('ws');
+const MODEL_ID = process.env.MODEL_ID;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const wss = new WebSocket.Server({ port: process.env.PORT || 8080 });
+
+if (!MODEL_ID || !OPENAI_API_KEY) {
+  throw new Error('MODEL_ID of OPENAI_API_KEY mist! Check je environment variables.');
+}
 
 wss.on('connection', function connection(clientWs) {
   console.log("Nieuwe Unity client verbonden");
