@@ -27,15 +27,16 @@ wss.on('connection', function connection(clientWs) {
   });
 
   // Relay messages from Unity to OpenAI
-  clientWs.on('message', (data) => {
-    if (!openAIReady) {
-      console.log("AI WebSocket not yet open, buffering Unity message");
-      pendingMessages.push(data);
-    } else {
-      // Forward Unity's message to OpenAI
-      openAIWs.send(data);
-    }
-  });
+clientWs.on('message', (data) => {
+  if (!openAIReady) {
+    console.log("AI WebSocket not yet open, buffering Unity message");
+    pendingMessages.push(data);
+  } else {
+    // Forward Unity's message to OpenAI
+    openAIWs.send(data);
+    console.log(`Bericht van Unity naar OpenAI (lengte ${data.length})`);
+  }
+}); 
 
   // Relay messages from OpenAI to Unity
   openAIWs.on('message', (data) => {
