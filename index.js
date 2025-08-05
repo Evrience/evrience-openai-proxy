@@ -12,11 +12,13 @@ server.on('connection', (clientWs) => {
 
     // OpenAI connectie
     const aiWs = new WebSocket(OPENAI_WS_URL, {
-        headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            // Voeg extra headers toe als nodig (bv. JWT!)
-        }
+    headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'realtime=v1' // <-- BELANGRIJK!
+        // Voeg extra headers toe als nodig (bv. JWT!)
+    }
     });
+
 
     // Proxy berichten van client → AI
     clientWs.on('message', (msg) => {
